@@ -16,7 +16,7 @@ mov sp, 0x7c00
 mov ax, 0xb800
 mov ds, ax
 ; 屏幕上第一个字符写成H
-mov byte[0], 'H'
+mov byte [0], 'H'
 
 ; 阻塞——跳转到当前行
 jmp $

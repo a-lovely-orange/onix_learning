@@ -1,3 +1,8 @@
+参考博客如下：
+1. https://blog.csdn.net/OceanWaves1993/article/details/130467985
+2. https://blog.csdn.net/earth1994/article/details/139706014
+
+
 # 更新VMware16到VMware17
 
 更新原因：archlinux下载的版本是2024.05.01，基于Linux6.0内核，但是VMware16没有Linux6.x内核选项，故更新，
