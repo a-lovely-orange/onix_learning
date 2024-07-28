@@ -34,15 +34,18 @@
 
 ## 格式化分区
 - `mkfs.ext4 /dev/sda1`
+- `mkswap /dev/sda4`
 
 ## 挂载分区
 - `mount /dev/sda1 /mnt`
+- `swapon /dev/sda4`
 
 ## 更新镜像
 - 'pacman -Sy'
 - 选zju镜像
 
-## 安装
+## 安装系统
+`pacstrap -i /mnt base base-devel linux linux-firmware`
 
 # 配置系统
 
@@ -85,10 +88,5 @@
   - `systemctl enable NetworkManager`：并设置为自启动
 - `pacman -S openssh`：安装openssh
   - `systemctl enable NetworkManager`：并设置为自启动
-- 添加用户
-
-
-# 配置引导
-- 安装引导：`pacman -S grub`
-- 安装BIOS引导：`grub-install --target=i386-pc /dev/sda`
-- 生成配置文件：`grub-mkconfig -o /boot/grub/grub.cfg`
+- `useradd -G root -m orange`：添加用户
+  - `passwd orange`：给orange设置密码
