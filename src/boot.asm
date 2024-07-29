@@ -11,27 +11,191 @@ mov es, ax
 mov ss, ax
 mov sp, 0x7c00
 
+xchg bx, bx ; bochs魔数断点
 
-; 0xb8000:文本显示器内存区域
-mov ax, 0xb800
-mov ds, ax
-; 屏幕上第一个字符写成H
-mov byte [0], 'H'
-mov byte [2], 'E'
-mov byte [4], 'L'
-mov byte [6], 'L'
-mov byte [8], 'O'
-mov byte [10], ','
-mov byte [12], 'W'
-mov byte [14], 'O'
-mov byte [16], 'R'
-mov byte [18], 'L'
-mov byte [20], 'D'
-mov byte [22], '!'
+mov si, booting
+call print
+
+mov edi, 0x1000 ; 读取的目标内存，从硬盘中读的数据要放在内存的0x1000处
+mov ecx, 0      ; 起始扇区标号，0即为主引导扇区
+mov bl, 1       ; 读取的扇区数量
+
+xchg bx, bx ; bochs魔数断点
+call read_disk
 
 
+xchg bx, bx ; bochs魔数断点
+mov edi, 0x1000
+mov ecx, 2
+mov bl, 1
+call write_disk 
+xchg bx, bx ; bochs魔数断点
 ; 阻塞——跳转到当前行
 jmp $
+
+;;;;;;;;;; 读硬盘 ;;;;;;;;;;
+read_disk:
+    ; 设置读写扇区的数量：把bl里的数据写到端口地址0x1f2的寄存器中
+    mov dx, 0x1f2   ; 读写扇区数量端口的地址
+    mov al, bl
+    out dx, al
+
+    ; dx = 0x1f3：起始扇区低八位
+    inc dx
+    mov al, cl
+    out dx, al
+
+    ; dx = 0x1f4：起始扇区中八位
+    inc dx
+    shr ecx, 8
+    mov al, cl
+    out dx, al
+
+    ; dx = 0x1f5：起始扇区高八位
+    inc dx
+    shr ecx, 8
+    mov al, cl
+    out dx, al
+
+    ; dx = 0x1f6
+    inc dx
+    shr ecx, 8
+    and ecx, 0b1111 ; 取出低四位
+    mov al, 0b1110_0000  ; 主盘、LBA
+    or al, cl
+    out dx, al
+
+    ; dx = 0x1f7,out
+    inc dx
+    mov al, 0x20    ; 读硬盘
+    out dx, al
+
+    xor ecx, ecx    ; ecx 清空
+    mov cl, bl      ; 得到读写扇区数量
+.read:
+    push cx     ; 保存cx
+    call .waits
+    call .reads
+    pop cx      ; 恢复cx
+    loop .read      ; 循环次数：cl
+    
+    ret
+    .waits
+        ; 读0x1f7   
+        mov dx, 0x1f7
+        .check
+            in al, dx
+            ; 延迟一段时间
+            jmp $+2 ; 相当于nop
+            jmp $+2
+            jmp $+2
+            and al, 0b1000_1000 ; 留下第3位和第7位
+            cmp al, 0b0000_1000 ; 数据是否准备好
+            jnz .check          ; 如果数据没有准备完毕；那么继续check
+        ret
+    .reads
+        ; 读0x1f0
+        mov dx, 0x1f0
+        mov cx, 256     ; 一个扇区有256个字=512字节
+        .readw
+            in ax, dx
+            jmp $+2 ; 相当于nop
+            jmp $+2
+            jmp $+2
+            mov [edi], ax
+            add edi, 2
+            loop .readw
+        ret
+
+;;;;;;;;;; 写硬盘 ;;;;;;;;;;
+write_disk:
+    ; 设置读写扇区的数量：把bl里的数据写到端口地址0x1f2的寄存器中
+    mov dx, 0x1f2   ; 读写扇区数量端口的地址
+    mov al, bl
+    out dx, al
+
+    ; dx = 0x1f3：起始扇区低八位
+    inc dx
+    mov al, cl
+    out dx, al
+
+    ; dx = 0x1f4：起始扇区中八位
+    inc dx
+    shr ecx, 8
+    mov al, cl
+    out dx, al
+
+    ; dx = 0x1f5：起始扇区高八位
+    inc dx
+    shr ecx, 8
+    mov al, cl
+    out dx, al
+
+    ; dx = 0x1f6
+    inc dx
+    shr ecx, 8
+    and ecx, 0b1111 ; 取出低四位
+    mov al, 0b1110_0000  ; 主盘、LBA
+    or al, cl
+    out dx, al
+
+    ; dx = 0x1f7,out
+    inc dx
+    mov al, 0x30    ; 写硬盘
+    out dx, al
+
+    xor ecx, ecx    ; ecx 清空
+    mov cl, bl      ; 得到读写扇区数量
+.write:
+    push cx     ; 保存cx
+    call .writes
+    call .waits
+    pop cx      ; 恢复cx
+    loop .write      ; 循环次数：cl
+    
+    ret
+
+.waits
+    ; 读0x1f7   
+    mov dx, 0x1f7
+    .check
+        in al, dx
+        ; 延迟一段时间
+        jmp $+2 ; 相当于nop
+        jmp $+2
+        jmp $+2
+        and al, 0b1000_1000 ; 留下第3位和第7位
+        cmp al, 0b0000_0000 ; 数据是否准备好
+        jnz .check          ; 如果数据没有准备完毕；那么继续check
+    ret
+.writes
+    ; 读0x1f0
+    mov dx, 0x1f0
+    mov cx, 256     ; 一个扇区有256个字=512字节
+    .writew
+        mov ax, [edi]
+        out dx, ax
+        jmp $+2 ; 相当于nop
+        jmp $+2
+        jmp $+2
+        add edi, 2
+        loop .writew
+    ret
+
+print:
+    mov ah, 0x0e
+.next:
+    mov al, [si]
+    cmp al, 0
+    jz .done
+    int 0x10
+    inc si
+    jmp .next
+.done:
+    ret
+
+booting:
+    db "Booting Onix...", 10, 13, 0 ;\n\r
 
 ; 填充0
 times 510 - ($ - $$) db 0
