@@ -17,6 +17,18 @@ mov ax, 0xb800
 mov ds, ax
 ; 屏幕上第一个字符写成H
 mov byte [0], 'H'
+mov byte [2], 'E'
+mov byte [4], 'L'
+mov byte [6], 'L'
+mov byte [8], 'O'
+mov byte [10], ','
+mov byte [12], 'W'
+mov byte [14], 'O'
+mov byte [16], 'R'
+mov byte [18], 'L'
+mov byte [20], 'D'
+mov byte [22], '!'
+
 
 ; 阻塞——跳转到当前行
 jmp $
